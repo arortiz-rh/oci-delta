@@ -3,7 +3,6 @@
 COVERDIR ?= $(CURDIR)/.coverdata
 
 VERSION := 0.1.0
-PACKAGE_NAME_VERSION = oci-delta-$(VERSION)
 
 build:
 	go build
@@ -12,7 +11,8 @@ clean:
 	rm -f oci-delta
 	rm -rf $(COVERDIR)
 	rm -rf $(CURDIR)/rpmbuild
-	rm -rf $(CURDIR)/release_artifacts
+	rm -f build/package/rpm/*-vendor.tar.bz2
+	rm -f build/package/rpm/oci-delta-*.tar.gz
 
 test: build
 	go test ./...
@@ -37,58 +37,42 @@ install:
 # RPM packaging
 #
 
-RPM_SPECFILE_IN=oci-delta.spec.in
-RPM_SPECFILE=rpmbuild/SPECS/oci-delta.spec
-RPM_TARBALL=rpmbuild/SOURCES/$(PACKAGE_NAME_VERSION).tar.gz
+RPM_PKGDIR = build/package/rpm
+RPM_SPECFILE = $(RPM_PKGDIR)/oci-delta.spec
+RPM_TOML = $(RPM_PKGDIR)/go-vendor-tools.toml
+RPM_TOPDIR = $(CURDIR)/rpmbuild
 
-.PHONY: $(RPM_SPECFILE)
-$(RPM_SPECFILE):
-	mkdir -p $(CURDIR)/rpmbuild/SPECS
-	sed -e "s/@@VERSION@@/$(VERSION)/g" $(RPM_SPECFILE_IN) > $(RPM_SPECFILE)
+.PHONY: vendor-tarball
+vendor-tarball:
+	git archive --prefix=oci-delta-$(VERSION)/ HEAD | gzip > $(RPM_PKGDIR)/oci-delta-$(VERSION).tar.gz
 	go mod vendor
-	./tools/rpm_spec_add_provides_bundle.sh $(RPM_SPECFILE)
-
-define get_package_name
-$(basename $(basename $(notdir $1)))
-endef
-
-define get_uncompressed_name
-$(1:.tar.gz=.tar)
-endef
-
-$(RPM_TARBALL): $(RPM_SPECFILE)
-	mkdir -p $(CURDIR)/rpmbuild/SOURCES
-	git archive --prefix=$(call get_package_name,$@)/ --format=tar.gz HEAD > $@
-	gunzip -f $@
-	tar --delete --owner=0 --group=0 --file $(call get_uncompressed_name,$@) $(call get_package_name,$@)/$(notdir $(RPM_SPECFILE_IN))
-	tar --append --owner=0 --group=0 --transform "s;^;$(call get_package_name,$@)/;" --file $(call get_uncompressed_name,$@) $(RPM_SPECFILE) vendor/
-	tar --append --owner=0 --group=0 --transform "s;$(dir $(RPM_SPECFILE));$(call get_package_name,$@)/;" --file $(call get_uncompressed_name,$@) $(RPM_SPECFILE)
-	gzip $(call get_uncompressed_name,$@)
+	tar cjf $(RPM_PKGDIR)/oci-delta-$(VERSION)-vendor.tar.bz2 vendor/
+	rm -rf vendor/
 
 .PHONY: srpm
-srpm: $(RPM_SPECFILE) $(RPM_TARBALL)
+srpm: vendor-tarball
+	mkdir -p $(RPM_TOPDIR)/SOURCES
+	cp $(RPM_PKGDIR)/oci-delta-*.tar.gz $(RPM_PKGDIR)/*-vendor.tar.bz2 $(RPM_TOML) $(RPM_TOPDIR)/SOURCES/
 	rpmbuild -bs \
-		--define "_topdir $(CURDIR)/rpmbuild" \
+		--define "_topdir $(RPM_TOPDIR)" \
 		--with tests \
 		$(RPM_SPECFILE)
 
 .PHONY: rpm
-rpm: $(RPM_SPECFILE) $(RPM_TARBALL)
+rpm: vendor-tarball
+	mkdir -p $(RPM_TOPDIR)/SOURCES
+	cp $(RPM_PKGDIR)/oci-delta-*.tar.gz $(RPM_PKGDIR)/*-vendor.tar.bz2 $(RPM_TOML) $(RPM_TOPDIR)/SOURCES/
 	rpmbuild -bb \
-		--define "_topdir $(CURDIR)/rpmbuild" \
+		--define "_topdir $(RPM_TOPDIR)" \
 		--with tests \
 		$(RPM_SPECFILE)
 
 .PHONY: scratch
-scratch: $(RPM_SPECFILE) $(RPM_TARBALL)
+scratch: vendor-tarball
+	mkdir -p $(RPM_TOPDIR)/SOURCES
+	cp $(RPM_PKGDIR)/oci-delta-*.tar.gz $(RPM_PKGDIR)/*-vendor.tar.bz2 $(RPM_TOML) $(RPM_TOPDIR)/SOURCES/
 	rpmbuild -bb \
-		--define "_topdir $(CURDIR)/rpmbuild" \
+		--define "_topdir $(RPM_TOPDIR)" \
 		--without tests \
 		--nocheck \
 		$(RPM_SPECFILE)
-
-.PHONY: release_artifacts
-release_artifacts: $(RPM_TARBALL)
-	mkdir -p release_artifacts
-	cp $< release_artifacts/
-	echo "release_artifacts/$(shell basename $<)"

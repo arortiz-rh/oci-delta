@@ -1,1 +1,10 @@
 /oci-delta
+go.sum
+rpmbuild/
+.claude/
+.github/
+vendor/
+
+
+*.bz2
+*.gz

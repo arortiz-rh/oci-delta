@@ -1,0 +1,50 @@
+---
+# https://packit.dev/docs/configuration/
+
+upstream_package_name: oci-delta
+downstream_package_name: oci-delta
+
+specfile_path: build/package/rpm/oci-delta.spec
+
+upstream_tag_template: v{version}
+
+srpm_build_deps:
+  - git
+  - golang
+  - go-vendor-tools
+  - python3-tomlkit
+  - askalono-cli
+
+actions:
+  post-modifications:
+    # https://fedora.gitlab.io/sigs/go/go-vendor-tools/scenarios/#manual-update
+    - |
+      bash -xc '
+      export GOTOOLCHAIN=auto
+      export BASE_DIR=${PACKIT_UPSTREAM_REPO}/build/package/rpm
+      export GO_VENDOR_TOOLS_CONFIG=${BASE_DIR}/go-vendor-tools.toml
+      export SPEC_FILE=${BASE_DIR}/oci-delta.spec
+      # Create source tarball from the PR source tree
+      VERSION=$(grep -m1 "^Version:" ${SPEC_FILE} | awk "{print \$2}")
+      cd ${PACKIT_UPSTREAM_REPO}
+      git archive --prefix=oci-delta-${VERSION}/ HEAD | gzip > ${BASE_DIR}/oci-delta-${VERSION}.tar.gz
+      go_vendor_archive create --config ${GO_VENDOR_TOOLS_CONFIG} ${SPEC_FILE}
+      go_vendor_license \
+        --config ${GO_VENDOR_TOOLS_CONFIG} \
+        --path ${SPEC_FILE} \
+        report \
+        --verify-spec
+      '
+
+jobs:
+  # Copr build on PRs — builds the RPM via Packit
+  # Only Fedora >= 43 have golang >= 1.25.0
+  - job: copr_build
+    trigger: pull_request
+    targets:
+      - "fedora-latest-stable-x86_64"
+      - "fedora-latest-stable-aarch64"
+      - "fedora-latest-x86_64"
+      - "fedora-latest-aarch64"
+      - "fedora-rawhide-x86_64"
+      - "fedora-rawhide-aarch64"
