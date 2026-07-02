@@ -34,6 +34,7 @@ func CreateDelta(oldReader OCIReader, newReader OCIReader, writer OCIWriter, opt
 	stats := &CreateStats{}
 
 	log.Debug("Parsing old image")
+
 	old, err := parseOCIImage(oldReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse old image: %w", err)
@@ -42,6 +43,7 @@ func CreateDelta(oldReader OCIReader, newReader OCIReader, writer OCIWriter, opt
 	log.Debug("  Found %d layers in old image", stats.OldLayers)
 
 	log.Debug("Parsing new image")
+
 	new, err := parseOCIImage(newReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse new image: %w", err)
@@ -52,6 +54,7 @@ func CreateDelta(oldReader OCIReader, newReader OCIReader, writer OCIWriter, opt
 	// Find layers with new content (diff_id not in old image)
 	newOnlyLayers := make(map[digest.Digest]bool)
 	oldReusedLayers := make(map[digest.Digest]bool)
+
 	for _, newLayer := range new.layers {
 		if oldLayer, exists := old.layerByDiffID[newLayer.DiffID]; exists {
 			oldReusedLayers[oldLayer.Digest] = true
@@ -66,15 +69,18 @@ func CreateDelta(oldReader OCIReader, newReader OCIReader, writer OCIWriter, opt
 	log.Debug("Layers with existing content (will skip): %d", stats.SkippedLayers)
 
 	log.Debug("\nProcessing layers...")
+
 	for _, l := range new.layers {
 		if !newOnlyLayers[l.Digest] {
 			log.Debug("  Skipping layer with existing content %s", l.Digest.Encoded()[:16])
 		}
 	}
+
 	layerResults, err := computeLayerDiffsParallel(log, old, new, newOnlyLayers, opts.TmpDir, opts.Parallelism)
 	if err != nil {
 		return nil, err
 	}
+
 	for _, r := range layerResults {
 		defer os.Remove(r.diffPath)
 	}
@@ -90,6 +96,7 @@ func CreateDelta(oldReader OCIReader, newReader OCIReader, writer OCIWriter, opt
 	if err != nil {
 		return nil, fmt.Errorf("failed to read new image manifest: %w", err)
 	}
+
 	imageConfigData, err := readBlob(new.reader, new.manifest.Config.Digest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read new image config: %w", err)
@@ -115,6 +122,7 @@ func CreateDelta(oldReader OCIReader, newReader OCIReader, writer OCIWriter, opt
 	})
 
 	var reusedDigests, reusedDiffIDs []string
+
 	for _, l := range new.layers {
 		if !newOnlyLayers[l.Digest] {
 			// Collect old reused non-delta layers
@@ -130,6 +138,7 @@ func CreateDelta(oldReader OCIReader, newReader OCIReader, writer OCIWriter, opt
 			annotationDeltaTo:      l.Digest.String(),
 		}
 		var desc v1.Descriptor
+
 		if r.diffPath != "" {
 			log.Debug("  Layer %s: using tar-diff (%d bytes, saved %d)", r.digest.Encoded()[:16], r.diffSize, r.actualSize-r.diffSize)
 			desc = v1.Descriptor{
@@ -153,6 +162,7 @@ func CreateDelta(oldReader OCIReader, newReader OCIReader, writer OCIWriter, opt
 	}
 
 	var sigArtifacts []*signatureArtifact
+
 	for _, sigReader := range opts.Signatures {
 		sig, err := loadSignatureArtifact(sigReader)
 		if err != nil {
@@ -197,6 +207,7 @@ func CreateDelta(oldReader OCIReader, newReader OCIReader, writer OCIWriter, opt
 		annotationDeltaSource:       old.manifestDigest.String(),
 		annotationDeltaSourceConfig: old.configDigest.String(),
 	}
+
 	if len(reusedDigests) > 0 {
 		reusedJSON, _ := json.Marshal(reusedDigests)
 		deltaAnnotations[annotationDeltaReused] = string(reusedJSON)
@@ -219,6 +230,7 @@ func CreateDelta(oldReader OCIReader, newReader OCIReader, writer OCIWriter, opt
 		Annotations: deltaAnnotations,
 		Layers:      deltaLayers,
 	}
+
 	deltaManifestData, err := json.Marshal(deltaManifest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal delta manifest: %w", err)
@@ -233,29 +245,35 @@ func CreateDelta(oldReader OCIReader, newReader OCIReader, writer OCIWriter, opt
 			buildIndexDescriptor(v1.MediaTypeImageManifest, deltaManifestDigest, int64(len(deltaManifestData)), writer.ImageName()),
 		},
 	}
+
 	indexData, err := json.Marshal(ociIndex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal index: %w", err)
 	}
 
 	log.Debug("\nWriting oci-layout")
+
 	if err := writer.WriteFile("oci-layout", ociLayoutFileData); err != nil {
 		return nil, err
 	}
 
 	log.Debug("Writing image manifest and config blobs")
+
 	if err := writer.WriteFile(blobTarName(new.manifestDigest), imageManifestData); err != nil {
 		return nil, err
 	}
+
 	if err := writer.WriteFile(blobTarName(new.manifest.Config.Digest), imageConfigData); err != nil {
 		return nil, err
 	}
 
 	log.Debug("Writing layer blobs")
+
 	for _, l := range new.layers {
 		if !newOnlyLayers[l.Digest] {
 			continue
 		}
+
 		r := layerResultByDigest[l.Digest]
 		if r.diffPath != "" {
 			if err := writeFileFromPath(writer, blobTarName(r.diffDigest), r.diffPath); err != nil {
@@ -275,6 +293,7 @@ func CreateDelta(oldReader OCIReader, newReader OCIReader, writer OCIWriter, opt
 		if err := writer.WriteFile(blobTarName(sig.manifestDigest), sig.manifestData); err != nil {
 			return nil, err
 		}
+
 		for dgst, data := range sig.blobs {
 			if err := writer.WriteFile(blobTarName(dgst), data); err != nil {
 				return nil, err
@@ -283,12 +302,15 @@ func CreateDelta(oldReader OCIReader, newReader OCIReader, writer OCIWriter, opt
 	}
 
 	log.Debug("Writing delta manifest and index.json")
+
 	if err := writer.WriteFile(blobTarName(deltaConfigDigest), deltaConfigData); err != nil {
 		return nil, err
 	}
+
 	if err := writer.WriteFile(blobTarName(deltaManifestDigest), deltaManifestData); err != nil {
 		return nil, err
 	}
+
 	if err := writer.WriteFile("index.json", indexData); err != nil {
 		return nil, err
 	}
@@ -323,6 +345,7 @@ func computeLayerDiffsParallel(log Logger, old *OCIImage, new *OCIImage, newOnly
 	diffOpts.SetTmpDir(tmpDir)
 
 	var oldFiles []io.ReadSeeker
+
 	for _, layer := range old.layers {
 		r, _, _, err := old.reader.ReadBlob(layer.Digest)
 		if err != nil {
@@ -367,6 +390,7 @@ func computeLayerDiffsParallel(log Logger, old *OCIImage, new *OCIImage, newOnly
 					os.Remove(r.diffPath)
 				}
 			}
+
 			return nil, err
 		}
 	}
@@ -374,7 +398,9 @@ func computeLayerDiffsParallel(log Logger, old *OCIImage, new *OCIImage, newOnly
 	return results, nil
 }
 
-func computeLayerDiff(log Logger, old *OCIImage, new *OCIImage, blobDigest digest.Digest, layerNum, total int, tmpDir string, sources *tardiff.SourceAnalysis, diffOpts *tardiff.Options) (layerDiffResult, error) {
+func computeLayerDiff(log Logger, old *OCIImage, new *OCIImage, blobDigest digest.Digest, layerNum, total int, tmpDir string,
+	sources *tardiff.SourceAnalysis, diffOpts *tardiff.Options) (layerDiffResult, error) {
+
 	sizeReader, originalSize, actualDigest, err := new.reader.ReadBlob(blobDigest)
 	if err != nil {
 		return layerDiffResult{}, fmt.Errorf("failed to get layer size %s: %w", blobDigest.Encoded()[:16], err)
@@ -393,6 +419,7 @@ func computeLayerDiff(log Logger, old *OCIImage, new *OCIImage, blobDigest diges
 	if err := runTarDiff(old, new, blobDigest, diffPath, sources, diffOpts); err != nil {
 		log.Warning("tar-diff failed for layer %s: %v, using original", blobDigest.Encoded()[:16], err)
 		os.Remove(diffPath)
+
 		return layerDiffResult{digest: blobDigest, actualSize: originalSize, actualDigest: actualDigest}, nil
 	}
 

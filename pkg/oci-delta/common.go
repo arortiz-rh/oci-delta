@@ -77,6 +77,7 @@ func parseOCIImage(reader OCIReader) (*OCIImage, error) {
 		if i < len(config.RootFS.DiffIDs) {
 			layers[i].DiffID = config.RootFS.DiffIDs[i]
 		}
+
 		layerByDigest[layers[i].Digest] = &layers[i]
 		if layers[i].DiffID != "" {
 			layerByDiffID[layers[i].DiffID] = &layers[i]
@@ -102,6 +103,7 @@ func digestFromBlobPath(path string) digest.Digest {
 	if isBlobPath(path) {
 		return digest.NewDigestFromEncoded(digest.SHA256, path[13:])
 	}
+
 	return ""
 }
 
@@ -110,11 +112,13 @@ func isTarDiff(data []byte) bool {
 	if len(data) < len(magic) {
 		return false
 	}
+
 	for i, b := range magic {
 		if data[i] != b {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -123,6 +127,7 @@ func writeTarMember(w *tar.Writer, header *tar.Header, data []byte) error {
 		return err
 	}
 	_, err := w.Write(data)
+
 	return err
 }
 
@@ -140,6 +145,7 @@ func writeTarFile(w *tar.Writer, name string, data []byte) error {
 		Mode: 0644,
 		Size: int64(len(data)),
 	}
+
 	return writeTarMember(w, header, data)
 }
 
@@ -153,6 +159,7 @@ func writeTarFileFromReader(w *tar.Writer, name string, size int64, r io.Reader)
 		return err
 	}
 	_, err := io.Copy(w, r)
+
 	return err
 }
 
@@ -175,6 +182,7 @@ func buildIndexDescriptor(mediaType string, dgst digest.Digest, size int64, imag
 			v1.AnnotationRefName: imageName,
 		}
 	}
+
 	return desc
 }
 
@@ -183,13 +191,16 @@ func verifyBlobDigest(r io.ReadSeeker, expected digest.Digest) error {
 	if _, err := io.Copy(h, r); err != nil {
 		return fmt.Errorf("failed to read blob for verification: %w", err)
 	}
+
 	actual := digest.NewDigestFromBytes(digest.SHA256, h.Sum(nil))
 	if actual != expected {
 		return fmt.Errorf("blob digest mismatch: expected %s, got %s", expected, actual)
 	}
+
 	if _, err := r.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("failed to seek after verification: %w", err)
 	}
+
 	return nil
 }
 
@@ -199,9 +210,11 @@ func computeFileDigest(path string) (digest.Digest, error) {
 		return "", err
 	}
 	defer f.Close()
+
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
 	}
+
 	return digest.NewDigestFromBytes(digest.SHA256, h.Sum(nil)), nil
 }

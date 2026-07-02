@@ -53,12 +53,14 @@ func runImport(cmd *cobra.Command, args []string) error {
 	log := &cmdLogger{debug: importDebug}
 
 	log.Debug("Opening delta: %s", args[0])
+
 	deltaReader, err := ocidelta.OpenOCIReader(args[0], tmpDir, log)
 	if err != nil {
 		return fmt.Errorf("failed to open delta: %w", err)
 	}
 
 	log.Debug("Parsing delta...")
+
 	delta, err := ocidelta.ParseDeltaArtifact(deltaReader, log)
 	if err != nil {
 		deltaReader.Close()
@@ -68,10 +70,12 @@ func runImport(cmd *cobra.Command, args []string) error {
 
 	if importVerifyKey != "" {
 		log.Debug("Verifying signature with key: %s", importVerifyKey)
+
 		verifier, err := sigstoreSignature.LoadVerifierFromPEMFile(importVerifyKey, crypto.SHA256)
 		if err != nil {
 			return fmt.Errorf("failed to load verification key %s: %w", importVerifyKey, err)
 		}
+
 		if err := ocidelta.VerifyDeltaSignature(delta, verifier, log); err != nil {
 			return fmt.Errorf("signature verification failed: %w", err)
 		}
@@ -86,5 +90,6 @@ func runImport(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println(imageID)
+
 	return nil
 }

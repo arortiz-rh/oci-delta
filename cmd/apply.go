@@ -52,12 +52,15 @@ func runApply(cmd *cobra.Command, args []string) error {
 	if repoExplicit {
 		sourceCount++
 	}
+
 	if applyDirectorySource != "" {
 		sourceCount++
 	}
+
 	if applyContainerStorage != "" {
 		sourceCount++
 	}
+
 	if sourceCount > 1 {
 		return fmt.Errorf("--ostree-repo, --directory, and --container-storage are mutually exclusive")
 	}
@@ -71,12 +74,14 @@ func runApply(cmd *cobra.Command, args []string) error {
 	log := &cmdLogger{debug: applyDebug}
 
 	log.Debug("Opening delta: %s", args[0])
+
 	deltaReader, err := ocidelta.OpenOCIReader(args[0], tmpDir, log)
 	if err != nil {
 		return fmt.Errorf("failed to open delta: %w", err)
 	}
 
 	log.Debug("Parsing delta...")
+
 	delta, err := ocidelta.ParseDeltaArtifact(deltaReader, log)
 	if err != nil {
 		deltaReader.Close()
@@ -86,19 +91,22 @@ func runApply(cmd *cobra.Command, args []string) error {
 
 	if applyVerifyKey != "" {
 		log.Debug("Verifying signature with key: %s", applyVerifyKey)
+
 		verifier, err := sigstoreSignature.LoadVerifierFromPEMFile(applyVerifyKey, crypto.SHA256)
 		if err != nil {
 			return fmt.Errorf("failed to load verification key %s: %w", applyVerifyKey, err)
 		}
+
 		if err := ocidelta.VerifyDeltaSignature(delta, verifier, log); err != nil {
 			return fmt.Errorf("signature verification failed: %w", err)
 		}
 	}
 
 	var dataSource ocidelta.DataSource
-	if applyDirectorySource != "" {
+	switch {
+	case applyDirectorySource != "":
 		dataSource = ocidelta.NewFilesystemDataSource(applyDirectorySource)
-	} else if applyContainerStorage != "" {
+	case applyContainerStorage != "":
 		store, err := ocidelta.OpenContainerStorage(applyContainerStorage)
 		if err != nil {
 			return err
@@ -109,13 +117,14 @@ func runApply(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-	} else {
+	default:
 		ds, err := ocidelta.ResolveOstreeDataSource(applyRepoPath, delta.SourceConfigDigest(), log)
 		if err != nil {
 			return err
 		}
 		dataSource = ds
 	}
+
 	defer func() {
 		_ = dataSource.Close()
 		_ = dataSource.Cleanup()
@@ -132,5 +141,6 @@ func runApply(cmd *cobra.Command, args []string) error {
 		writer.Close()
 		return err
 	}
+
 	return writer.Close()
 }

@@ -26,27 +26,33 @@ func (l *testLogger) Warning(format string, args ...interface{}) {}
 
 func createTestKey(t *testing.T) (sigstoreSignature.Verifier, *ecdsa.PrivateKey) {
 	t.Helper()
+
 	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	verifier, err := sigstoreSignature.LoadVerifier(privKey.Public(), crypto.SHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return verifier, privKey
 }
 
 func signPayload(t *testing.T, privKey *ecdsa.PrivateKey, payload []byte) string {
 	t.Helper()
+
 	signer, err := sigstoreSignature.LoadECDSASignerVerifier(privKey, crypto.SHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	sig, err := signer.SignMessage(bytes.NewReader(payload))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return base64.StdEncoding.EncodeToString(sig)
 }
 
@@ -60,6 +66,7 @@ func (m *memReader) ReadBlob(d digest.Digest) (io.ReadSeekCloser, int64, digest.
 		return nil, 0, "", os.ErrNotExist
 	}
 	r := bytes.NewReader(data)
+
 	return readSeekNopCloser{r}, int64(len(data)), d, nil
 }
 
@@ -71,6 +78,7 @@ func (m *memReader) Close() error { return nil }
 
 func buildTestDelta(t *testing.T, manifestDigest digest.Digest, sigManifest v1.Manifest, sigBlobs map[digest.Digest][]byte) *DeltaArtifact {
 	t.Helper()
+
 	return &DeltaArtifact{
 		reader:              &memReader{blobs: sigBlobs},
 		imageManifestDigest: manifestDigest,

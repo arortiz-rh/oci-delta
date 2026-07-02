@@ -33,6 +33,7 @@ func ImportDelta(delta *DeltaArtifact, store storage.Store, opts ImportOptions, 
 	storageLayers := make([]*storage.Layer, len(delta.imageManifest.Layers))
 
 	log.Debug("\nProcessing layers...")
+
 	for i, layer := range delta.imageManifest.Layers {
 		var diffID digest.Digest
 		if i < len(layerDiffIDs) {
@@ -40,15 +41,18 @@ func ImportDelta(delta *DeltaArtifact, store storage.Store, opts ImportOptions, 
 		}
 
 		deltaLayer, inDelta := delta.deltaLayerByTo[layer.Digest]
-		if !inDelta {
+
+		switch {
+		case !inDelta:
 			sl, err := reuseStorageLayer(store, diffID, parentLayerID, opts.TmpDir, log)
 			if err != nil {
 				return "", err
 			}
 			storageLayers[i] = sl
 			parentLayerID = sl.ID
-		} else if deltaLayer.MediaType == mediaTypeTarDiff {
+		case deltaLayer.MediaType == mediaTypeTarDiff:
 			log.Debug("  Layer %d: reconstructing from tar-diff", i)
+
 			r, err := delta.GetBlobReader(deltaLayer.Digest)
 			if err != nil {
 				return "", fmt.Errorf("failed to read tar-diff: %w", err)
@@ -61,18 +65,21 @@ func ImportDelta(delta *DeltaArtifact, store storage.Store, opts ImportOptions, 
 
 			newLayer, _, err := store.PutLayer("", parentLayerID, nil, "", false, nil, pr)
 			pr.Close()
+
 			if err != nil {
 				return "", fmt.Errorf("failed to store reconstructed layer: %w", err)
 			}
 			storageLayers[i] = newLayer
 			parentLayerID = newLayer.ID
 			log.Debug("    Created layer %s", newLayer.ID[:16])
-		} else {
+		default:
 			log.Debug("  Layer %d: importing original layer", i)
+
 			r, err := delta.GetBlobReader(deltaLayer.Digest)
 			if err != nil {
 				return "", fmt.Errorf("failed to read layer: %w", err)
 			}
+
 			gzReader, err := gzip.NewReader(r)
 			if err != nil {
 				return "", fmt.Errorf("failed to decompress layer: %w", err)
@@ -80,6 +87,7 @@ func ImportDelta(delta *DeltaArtifact, store storage.Store, opts ImportOptions, 
 
 			newLayer, _, err := store.PutLayer("", parentLayerID, nil, "", false, nil, gzReader)
 			gzReader.Close()
+
 			if err != nil {
 				return "", fmt.Errorf("failed to store layer: %w", err)
 			}
@@ -92,6 +100,7 @@ func ImportDelta(delta *DeltaArtifact, store storage.Store, opts ImportOptions, 
 	outputManifest := delta.imageManifest
 	outputManifest.Layers = make([]v1.Descriptor, len(delta.imageManifest.Layers))
 	copy(outputManifest.Layers, delta.imageManifest.Layers)
+
 	for i, sl := range storageLayers {
 		if sl.CompressedDigest != "" {
 			outputManifest.Layers[i].Digest = sl.CompressedDigest
@@ -112,6 +121,7 @@ func ImportDelta(delta *DeltaArtifact, store storage.Store, opts ImportOptions, 
 	if opts.Tag != "" {
 		names = []string{opts.Tag}
 	}
+
 	image, err := store.CreateImage("", names, parentLayerID, "", nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create image: %w", err)
@@ -121,6 +131,7 @@ func ImportDelta(delta *DeltaArtifact, store storage.Store, opts ImportOptions, 
 	if err := store.SetImageBigData(image.ID, "manifest", manifestData, manifestDigestFunc); err != nil {
 		return "", fmt.Errorf("failed to store manifest: %w", err)
 	}
+
 	manifestKey := storage.ImageDigestManifestBigDataNamePrefix + "-" + manifestDigest.String()
 	if err := store.SetImageBigData(image.ID, manifestKey, manifestData, manifestDigestFunc); err != nil {
 		return "", fmt.Errorf("failed to store manifest: %w", err)
@@ -130,11 +141,13 @@ func ImportDelta(delta *DeltaArtifact, store storage.Store, opts ImportOptions, 
 	if err != nil {
 		return "", fmt.Errorf("failed to read config: %w", err)
 	}
+
 	if err := store.SetImageBigData(image.ID, delta.imageConfigDigest.String(), configData, nil); err != nil {
 		return "", fmt.Errorf("failed to store config: %w", err)
 	}
 
 	log.Debug("Import complete!")
+
 	return image.ID, nil
 }
 
@@ -155,10 +168,12 @@ func reuseStorageLayer(store storage.Store, diffID digest.Digest, parentLayerID 
 	if len(existing) > 0 {
 		log.Debug("    Recreating with correct parent chain")
 		el := existing[0]
+
 		diffReader, err := store.Diff(el.Parent, el.ID, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to extract layer diff: %w", err)
 		}
+
 		tmpFile, err := os.CreateTemp(tmpDir, "oci-delta-layer-*.tar")
 		if err != nil {
 			diffReader.Close()
@@ -166,18 +181,22 @@ func reuseStorageLayer(store storage.Store, diffID digest.Digest, parentLayerID 
 		}
 		defer os.Remove(tmpFile.Name())
 		defer tmpFile.Close()
+
 		if _, err := io.Copy(tmpFile, diffReader); err != nil {
 			diffReader.Close()
 			return nil, fmt.Errorf("failed to buffer layer diff: %w", err)
 		}
 		diffReader.Close()
+
 		if _, err := tmpFile.Seek(0, 0); err != nil {
 			return nil, err
 		}
+
 		newLayer, _, err := store.PutLayer("", parentLayerID, nil, "", false, nil, tmpFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to recreate layer: %w", err)
 		}
+
 		return newLayer, nil
 	}
 

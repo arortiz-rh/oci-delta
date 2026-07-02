@@ -33,24 +33,30 @@ func TestLoadSignatureArtifact(t *testing.T) {
 	if got.manifestDigest != want.manifestDigest {
 		t.Errorf("manifestDigest = %s, want %s", got.manifestDigest, want.manifestDigest)
 	}
+
 	if !bytes.Equal(got.manifestData, want.manifestData) {
 		t.Errorf("manifestData mismatch")
 	}
+
 	if len(got.manifest.Layers) != len(want.manifest.Layers) {
 		t.Errorf("len(manifest.Layers) = %d, want %d", len(got.manifest.Layers), len(want.manifest.Layers))
 	}
+
 	if got.manifest.Config.Digest != want.manifest.Config.Digest {
 		t.Errorf("manifest.Config.Digest = %s, want %s", got.manifest.Config.Digest, want.manifest.Config.Digest)
 	}
+
 	if len(got.blobs) != len(want.blobs) {
 		t.Errorf("len(blobs) = %d, want %d", len(got.blobs), len(want.blobs))
 	}
+
 	for d, data := range want.blobs {
 		gotData, ok := got.blobs[d]
 		if !ok {
 			t.Errorf("missing blob %s", d)
 			continue
 		}
+
 		if !bytes.Equal(gotData, data) {
 			t.Errorf("blob %s content mismatch", d)
 		}
@@ -69,6 +75,7 @@ func TestLoadSignatureArtifactErrors(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected parse error for invalid signature manifest json")
 		}
+
 		if !strings.Contains(err.Error(), "failed to parse signature manifest") {
 			t.Errorf("unexpected error %q", err)
 		}
@@ -89,6 +96,7 @@ func TestLoadSignatureArtifactErrors(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error when reading signature manifest digest")
 		}
+
 		if !strings.Contains(err.Error(), "failed to read signature manifest digest") {
 			t.Errorf("unexpected error %q", err)
 		}
@@ -97,10 +105,12 @@ func TestLoadSignatureArtifactErrors(t *testing.T) {
 	t.Run("fails when reading signature manifest blob", func(t *testing.T) {
 		validArtifact := mustBuildDefaultSignatureArtifact(t)
 		flaky := newFailingBlobReader(newSignatureOCIReader(t, validArtifact), validArtifact.manifestDigest, 1, errors.New("manifest read failed"))
+
 		_, err := loadSignatureArtifact(flaky)
 		if err == nil {
 			t.Fatal("expected error when reading signature manifest blob")
 		}
+
 		if !strings.Contains(err.Error(), "failed to read signature manifest") {
 			t.Errorf("unexpected error %q", err)
 		}
@@ -117,6 +127,7 @@ func TestCreateDeltaTracksReusedAndProcessedLayers(t *testing.T) {
 	newImage := newTestOCIReader(t, []testLayer{reusedLayer, newLayer})
 
 	outputDir := t.TempDir()
+
 	writer, err := newDirOCIWriter(outputDir, "")
 	if err != nil {
 		t.Fatalf("newDirOCIWriter() error = %v", err)
@@ -133,18 +144,23 @@ func TestCreateDeltaTracksReusedAndProcessedLayers(t *testing.T) {
 	if stats.OldLayers != 1 {
 		t.Errorf("OldLayers = %d, want 1", stats.OldLayers)
 	}
+
 	if stats.NewLayers != 2 {
 		t.Errorf("NewLayers = %d, want 2", stats.NewLayers)
 	}
+
 	if stats.ProcessedLayers != 1 {
 		t.Errorf("ProcessedLayers = %d, want 1", stats.ProcessedLayers)
 	}
+
 	if stats.SkippedLayers != 1 {
 		t.Errorf("SkippedLayers = %d, want 1", stats.SkippedLayers)
 	}
+
 	if stats.ProcessedLayerBytes <= 0 {
 		t.Errorf("ProcessedLayerBytes = %d, want > 0", stats.ProcessedLayerBytes)
 	}
+
 	if stats.ProcessedLayerBytes != stats.TarDiffLayerBytes+stats.OriginalLayerBytes {
 		t.Errorf("ProcessedLayerBytes (%d) != TarDiffLayerBytes (%d) + OriginalLayerBytes (%d)",
 			stats.ProcessedLayerBytes, stats.TarDiffLayerBytes, stats.OriginalLayerBytes)
@@ -155,9 +171,11 @@ func TestCreateDeltaTracksReusedAndProcessedLayers(t *testing.T) {
 	if deltaManifest.Annotations[annotationDeltaTarget] != newImage.manifestDigest.String() {
 		t.Errorf("target annotation = %q, want %q", deltaManifest.Annotations[annotationDeltaTarget], newImage.manifestDigest)
 	}
+
 	if deltaManifest.Annotations[annotationDeltaSource] != oldImage.manifestDigest.String() {
 		t.Errorf("source annotation = %q, want %q", deltaManifest.Annotations[annotationDeltaSource], oldImage.manifestDigest)
 	}
+
 	if deltaManifest.Annotations[annotationDeltaSourceConfig] != oldImage.configDigest.String() {
 		t.Errorf("source-config annotation = %q, want %q", deltaManifest.Annotations[annotationDeltaSourceConfig], oldImage.configDigest)
 	}
@@ -166,6 +184,7 @@ func TestCreateDeltaTracksReusedAndProcessedLayers(t *testing.T) {
 	if err := json.Unmarshal([]byte(deltaManifest.Annotations[annotationDeltaReused]), &reusedDigests); err != nil {
 		t.Fatalf("failed to decode reused digests: %v", err)
 	}
+
 	if len(reusedDigests) != 1 || reusedDigests[0] != reusedLayer.digest.String() {
 		t.Errorf("reused digests = %v, want [%s]", reusedDigests, reusedLayer.digest)
 	}
@@ -174,20 +193,24 @@ func TestCreateDeltaTracksReusedAndProcessedLayers(t *testing.T) {
 	if err := json.Unmarshal([]byte(deltaManifest.Annotations[annotationDeltaReusedDiffID]), &reusedDiffIDs); err != nil {
 		t.Fatalf("failed to decode reused diff_ids: %v", err)
 	}
+
 	if len(reusedDiffIDs) != 1 || reusedDiffIDs[0] != reusedLayer.diffID.String() {
 		t.Errorf("reused diff_ids = %v, want [%s]", reusedDiffIDs, reusedLayer.diffID)
 	}
 
 	imageLayerCount := 0
+
 	for _, layer := range deltaManifest.Layers {
 		if layer.Annotations[annotationDeltaContent] != "image-layer" {
 			continue
 		}
 		imageLayerCount++
+
 		if layer.Annotations[annotationDeltaTo] != newLayer.digest.String() {
 			t.Errorf("delta.to = %q, want %q", layer.Annotations[annotationDeltaTo], newLayer.digest)
 		}
 	}
+
 	if imageLayerCount != 1 {
 		t.Errorf("image-layer count = %d, want 1", imageLayerCount)
 	}
@@ -202,10 +225,12 @@ func TestCreateDeltaEmbedsSignatureArtifacts(t *testing.T) {
 	sigArtifact := mustBuildDefaultSignatureArtifact(t)
 
 	outputDir := t.TempDir()
+
 	writer, err := newDirOCIWriter(outputDir, "")
 	if err != nil {
 		t.Fatalf("newDirOCIWriter() error = %v", err)
 	}
+
 	_, err = CreateDelta(oldImage.reader, newImage.reader, writer, CreateOptions{
 		TmpDir:      t.TempDir(),
 		Parallelism: 1,
@@ -218,6 +243,7 @@ func TestCreateDeltaEmbedsSignatureArtifacts(t *testing.T) {
 	deltaManifest := readOutputDeltaManifest(t, outputDir)
 
 	var sigManifestLayers, sigContentLayers int
+
 	for _, layer := range deltaManifest.Layers {
 		switch layer.Annotations[annotationDeltaContent] {
 		case "cosign-signature":
@@ -226,9 +252,11 @@ func TestCreateDeltaEmbedsSignatureArtifacts(t *testing.T) {
 			sigContentLayers++
 		}
 	}
+
 	if sigManifestLayers != 1 {
 		t.Errorf("cosign-signature layer count = %d, want 1", sigManifestLayers)
 	}
+
 	wantContentLayers := 1 + len(sigArtifact.manifest.Layers) // config + signature payload layers
 	if sigContentLayers != wantContentLayers {
 		t.Errorf("cosign-signature-content layer count = %d, want %d", sigContentLayers, wantContentLayers)
@@ -237,6 +265,7 @@ func TestCreateDeltaEmbedsSignatureArtifacts(t *testing.T) {
 	if _, err := os.ReadFile(filepath.Join(outputDir, blobTarName(sigArtifact.manifestDigest))); err != nil {
 		t.Errorf("embedded signature manifest blob missing: %v", err)
 	}
+
 	for d := range sigArtifact.blobs {
 		if _, err := os.ReadFile(filepath.Join(outputDir, blobTarName(d))); err != nil {
 			t.Errorf("embedded signature blob %s missing: %v", d, err)
@@ -343,6 +372,7 @@ func newSignatureOCIReader(t *testing.T, artifact *signatureArtifact) OCIReader 
 	for d, data := range artifact.blobs {
 		files[blobTarName(d)] = data
 	}
+
 	return newMemoryReader(files)
 }
 
@@ -363,9 +393,11 @@ func runCreateDelta(t *testing.T, old OCIReader, new OCIReader, signatures ...OC
 
 func requireErrorContains(t *testing.T, err error, want string) {
 	t.Helper()
+
 	if err == nil {
 		t.Fatal("expected error")
 	}
+
 	if !strings.Contains(err.Error(), want) {
 		t.Fatalf("unexpected error %q, want substring %q", err, want)
 	}
@@ -373,6 +405,7 @@ func requireErrorContains(t *testing.T, err error, want string) {
 
 func mustBuildDefaultSignatureArtifact(t *testing.T) *signatureArtifact {
 	t.Helper()
+
 	artifact, err := buildSignatureArtifact([]sigstoreJSONRepresentation{{
 		MIMEType: "application/vnd.dev.cosign.simplesigning.v1+json",
 		Payload:  []byte(`{"critical":{"type":"cosign container image signature"}}`),
@@ -383,6 +416,7 @@ func mustBuildDefaultSignatureArtifact(t *testing.T) *signatureArtifact {
 	if err != nil {
 		t.Fatalf("buildSignatureArtifact() error = %v", err)
 	}
+
 	return artifact
 }
 
@@ -404,6 +438,7 @@ func newTestLayer(t *testing.T, path string, content string) testLayer {
 	var tarBuf bytes.Buffer
 	tw := tar.NewWriter(&tarBuf)
 	payload := []byte(content)
+
 	hdr := &tar.Header{
 		Name:    path,
 		Mode:    0o644,
@@ -413,9 +448,11 @@ func newTestLayer(t *testing.T, path string, content string) testLayer {
 	if err := tw.WriteHeader(hdr); err != nil {
 		t.Fatalf("WriteHeader() error = %v", err)
 	}
+
 	if _, err := tw.Write(payload); err != nil {
 		t.Fatalf("Write() error = %v", err)
 	}
+
 	if err := tw.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
@@ -423,12 +460,14 @@ func newTestLayer(t *testing.T, path string, content string) testLayer {
 	diffID := computeDigest(tarBuf.Bytes())
 
 	var gzBuf bytes.Buffer
+
 	gzw := gzip.NewWriter(&gzBuf)
 	gzw.Name = ""
 	gzw.ModTime = time.Unix(0, 0)
 	if _, err := gzw.Write(tarBuf.Bytes()); err != nil {
 		t.Fatalf("gzip Write() error = %v", err)
 	}
+
 	if err := gzw.Close(); err != nil {
 		t.Fatalf("gzip Close() error = %v", err)
 	}
@@ -504,18 +543,22 @@ func readOutputDeltaManifest(t *testing.T, outputDir string) v1.Manifest {
 	t.Helper()
 
 	reader := NewDirOCIReader(outputDir, "")
+
 	manifestDigest, err := reader.GetManifestDigest()
 	if err != nil {
 		t.Fatalf("GetManifestDigest() error = %v", err)
 	}
+
 	manifestData, err := readBlob(reader, manifestDigest)
 	if err != nil {
 		t.Fatalf("readBlob() error = %v", err)
 	}
+
 	var manifest v1.Manifest
 	if err := json.Unmarshal(manifestData, &manifest); err != nil {
 		t.Fatalf("Unmarshal(delta manifest) error = %v", err)
 	}
+
 	return manifest
 }
 
@@ -549,6 +592,7 @@ func (r *failingBlobReader) ReadBlob(d digest.Digest) (io.ReadSeekCloser, int64,
 	if d == r.failBlob && r.readCount[d] == r.failAt {
 		return nil, 0, "", r.failErr
 	}
+
 	return r.base.ReadBlob(d)
 }
 
@@ -587,6 +631,7 @@ func (w *failingPrefixWriter) WriteFile(name string, data []byte) error {
 			return w.failErr
 		}
 	}
+
 	return nil
 }
 
@@ -598,6 +643,7 @@ func (w *failingPrefixWriter) WriteFileFromReader(name string, _ int64, r io.Rea
 		}
 	}
 	_, err := io.Copy(io.Discard, r)
+
 	return err
 }
 

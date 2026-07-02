@@ -77,16 +77,20 @@ func TestIsTarDiff(t *testing.T) {
 
 func TestComputeDigest(t *testing.T) {
 	data := []byte("hello world")
+
 	d := computeDigest(data)
 	if d.Algorithm() != digest.SHA256 {
 		t.Errorf("expected SHA256, got %s", d.Algorithm())
 	}
+
 	if err := d.Validate(); err != nil {
 		t.Errorf("invalid digest: %v", err)
 	}
+
 	if computeDigest(data) != d {
 		t.Error("same input produced different digests")
 	}
+
 	if computeDigest([]byte("other")) == d {
 		t.Error("different input produced same digest")
 	}
@@ -107,6 +111,7 @@ func TestComputeFileDigest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	want := computeDigest(data)
 	if got != want {
 		t.Errorf("computeFileDigest = %s, want %s", got, want)
@@ -136,6 +141,7 @@ func TestVerifyBlobDigest(t *testing.T) {
 
 	// Mismatched digest
 	r.Seek(0, io.SeekStart)
+
 	wrongDigest := digest.FromBytes([]byte("wrong"))
 	if err := verifyBlobDigest(r, wrongDigest); err == nil {
 		t.Error("expected error for digest mismatch")
@@ -190,21 +196,27 @@ func TestParseOCIImage(t *testing.T) {
 	if len(img.layers) != 1 {
 		t.Fatalf("expected 1 layer, got %d", len(img.layers))
 	}
+
 	if img.layers[0].Digest != layerDigest {
 		t.Errorf("layer digest = %s, want %s", img.layers[0].Digest, layerDigest)
 	}
+
 	if img.layers[0].DiffID.String() != "sha256:aaaa000000000000000000000000000000000000000000000000000000000000" {
 		t.Errorf("unexpected diff_id: %s", img.layers[0].DiffID)
 	}
+
 	if img.configDigest != configDigest {
 		t.Errorf("config digest = %s, want %s", img.configDigest, configDigest)
 	}
+
 	if img.manifestDigest != manifestDigest {
 		t.Errorf("manifest digest = %s, want %s", img.manifestDigest, manifestDigest)
 	}
+
 	if _, ok := img.layerByDigest[layerDigest]; !ok {
 		t.Error("layer not in layerByDigest map")
 	}
+
 	if _, ok := img.layerByDiffID[img.layers[0].DiffID]; !ok {
 		t.Error("layer not in layerByDiffID map")
 	}
@@ -214,6 +226,7 @@ func TestParseOCIImageNoManifests(t *testing.T) {
 	reader := newMemoryReader(map[string][]byte{
 		"index.json": []byte(`{"schemaVersion":2,"manifests":[]}`),
 	})
+
 	_, err := parseOCIImage(reader)
 	if err == nil {
 		t.Fatal("expected error for empty manifests")
@@ -231,6 +244,7 @@ func TestParseOCIImageManifestList(t *testing.T) {
 			}]
 		}`),
 	})
+
 	_, err := parseOCIImage(reader)
 	if err == nil {
 		t.Fatal("expected error for manifest list")
@@ -241,6 +255,7 @@ func TestParseOCIImageInvalidJSON(t *testing.T) {
 	reader := newMemoryReader(map[string][]byte{
 		"index.json": []byte(`not json`),
 	})
+
 	_, err := parseOCIImage(reader)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
@@ -249,6 +264,7 @@ func TestParseOCIImageInvalidJSON(t *testing.T) {
 
 func TestParseOCIImageMissingIndex(t *testing.T) {
 	reader := newMemoryReader(map[string][]byte{})
+
 	_, err := parseOCIImage(reader)
 	if err == nil {
 		t.Fatal("expected error for missing index.json")
@@ -264,6 +280,7 @@ func itoa(n int) string {
 func makeBlob(t *testing.T, json string) (digest.Digest, []byte) {
 	t.Helper()
 	data := []byte(json)
+
 	return digest.FromBytes(data), data
 }
 
@@ -280,6 +297,7 @@ func (m *memoryReader) GetManifestDigest() (digest.Digest, error) {
 	if !ok {
 		return "", fmt.Errorf("index.json not found")
 	}
+
 	return parseManifestDigestFromIndex(data, "")
 }
 
@@ -288,6 +306,7 @@ func (m *memoryReader) ReadBlob(d digest.Digest) (io.ReadSeekCloser, int64, dige
 	if !ok {
 		return nil, 0, "", fmt.Errorf("blob not found: %s", d)
 	}
+
 	return readSeekNopCloser{bytes.NewReader(data)}, int64(len(data)), d, nil
 }
 
