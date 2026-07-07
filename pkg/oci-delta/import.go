@@ -18,11 +18,7 @@ type ImportOptions struct {
 	TmpDir string
 }
 
-func ImportDelta(delta *DeltaArtifact, store storage.Store, opts ImportOptions, log Logger) (string, error) {
-	dataSource, err := ResolveContainerStorageDataSource(store, delta.sourceConfigDigest, log)
-	if err != nil {
-		return "", fmt.Errorf("failed to create data source: %w", err)
-	}
+func ImportDelta(delta *DeltaArtifact, store storage.Store, dataSource DataSource, opts ImportOptions, log Logger) (string, error) {
 	defer func() {
 		_ = dataSource.Close()
 		_ = dataSource.Cleanup()
