@@ -26,10 +26,10 @@ type mockOCIWriter struct {
 	writeErr  error // for simulating write failures
 }
 
-func newMockOCIWriter(imageName string) *mockOCIWriter {
+func newMockOCIWriter() *mockOCIWriter {
 	return &mockOCIWriter{
 		files:     make(map[string][]byte),
-		imageName: imageName,
+		imageName: "test-image",
 	}
 }
 
@@ -38,6 +38,7 @@ func (m *mockOCIWriter) WriteFile(name string, data []byte) error {
 		return m.writeErr
 	}
 	m.files[name] = data
+
 	return nil
 }
 
@@ -45,11 +46,13 @@ func (m *mockOCIWriter) WriteFileFromReader(name string, size int64, r io.Reader
 	if m.writeErr != nil {
 		return m.writeErr
 	}
+
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
 	m.files[name] = data
+
 	return nil
 }
 
@@ -86,10 +89,12 @@ func (m *mockOCIReader) ReadBlob(d digest.Digest) (io.ReadSeekCloser, int64, dig
 	if m.readErr != nil {
 		return nil, 0, "", m.readErr
 	}
+
 	data, ok := m.blobs[d]
 	if !ok {
 		return nil, 0, "", fmt.Errorf("blob not found: %s", d)
 	}
+
 	return readSeekNopCloser{bytes.NewReader(data)}, int64(len(data)), d, nil
 }
 
@@ -122,17 +127,20 @@ func (m *mockDataSource) SetCurrentFile(file string) error {
 	if m.err != nil {
 		return m.err
 	}
+
 	data, ok := m.files[file]
 	if !ok {
 		// File not found is OK for tar-patch - it might be a new file
 		m.currentFile = file
 		m.currentData = nil
 		m.pos = 0
+
 		return nil
 	}
 	m.currentFile = file
 	m.currentData = data
 	m.pos = 0
+
 	return nil
 }
 
@@ -143,6 +151,7 @@ func (m *mockDataSource) Read(p []byte) (n int, err error) {
 	}
 	n = copy(p, m.currentData[m.pos:])
 	m.pos += int64(n)
+
 	return n, nil
 }
 
@@ -163,10 +172,12 @@ func (m *mockDataSource) Seek(offset int64, whence int) (int64, error) {
 	default:
 		return 0, fmt.Errorf("invalid whence")
 	}
+
 	if newPos < 0 {
 		return 0, fmt.Errorf("negative position")
 	}
 	m.pos = newPos
+
 	return m.pos, nil
 }
 
@@ -192,6 +203,7 @@ func createSimpleTar(fileName string, fileContent []byte) []byte {
 	})
 	tw.Write(fileContent)
 	tw.Close()
+
 	return buf.Bytes()
 }
 
@@ -214,6 +226,7 @@ func createTestTarDiff(t *testing.T, fileName string, fileContent []byte) []byte
 	newReader := bytes.NewReader(newTar)
 
 	opts := tardiff.NewOptions()
+
 	err := tardiff.Diff(oldReaders, newReader, &diffBuf, opts)
 	if err != nil {
 		t.Fatalf("failed to create tar-diff: %v", err)
@@ -231,7 +244,7 @@ func TestCopyBlobAndRenameSuccess(t *testing.T) {
 	reader := newMockOCIReader()
 	reader.addBlob(d, data)
 
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 
 	err := copyBlobAndRename(writer, reader, d, d)
 	if err != nil {
@@ -243,6 +256,7 @@ func TestCopyBlobAndRenameSuccess(t *testing.T) {
 	if !ok {
 		t.Fatal("blob was not written")
 	}
+
 	if !bytes.Equal(written, data) {
 		t.Errorf("written data = %q, want %q", written, data)
 	}
@@ -256,13 +270,14 @@ func TestCopyBlobAndRenameWithDifferentDigest(t *testing.T) {
 	reader := newMockOCIReader()
 	reader.addBlob(sourceDigest, data)
 
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 
 	// This should fail because the actual digest doesn't match targetDigest
 	err := copyBlobAndRename(writer, reader, sourceDigest, targetDigest)
 	if err == nil {
 		t.Fatal("expected error for digest mismatch, got nil")
 	}
+
 	if !strings.Contains(err.Error(), "digest mismatch") {
 		t.Errorf("expected 'digest mismatch' error, got: %v", err)
 	}
@@ -272,13 +287,15 @@ func TestCopyBlobAndRenameReadError(t *testing.T) {
 	reader := newMockOCIReader()
 	reader.readErr = fmt.Errorf("simulated read error")
 
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 
 	d := digest.FromBytes([]byte("test"))
+
 	err := copyBlobAndRename(writer, reader, d, d)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
+
 	if !strings.Contains(err.Error(), "simulated read error") {
 		t.Errorf("expected read error, got: %v", err)
 	}
@@ -291,13 +308,14 @@ func TestCopyBlobAndRenameWriteError(t *testing.T) {
 	reader := newMockOCIReader()
 	reader.addBlob(d, data)
 
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 	writer.writeErr = fmt.Errorf("simulated write error")
 
 	err := copyBlobAndRename(writer, reader, d, d)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
+
 	if !strings.Contains(err.Error(), "simulated write error") {
 		t.Errorf("expected write error, got: %v", err)
 	}
@@ -305,13 +323,15 @@ func TestCopyBlobAndRenameWriteError(t *testing.T) {
 
 func TestCopyBlobAndRenameMissingBlob(t *testing.T) {
 	reader := newMockOCIReader()
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 
 	d := digest.FromBytes([]byte("nonexistent"))
+
 	err := copyBlobAndRename(writer, reader, d, d)
 	if err == nil {
 		t.Fatal("expected error for missing blob, got nil")
 	}
+
 	if !strings.Contains(err.Error(), "blob not found") {
 		t.Errorf("expected 'blob not found' error, got: %v", err)
 	}
@@ -326,7 +346,7 @@ func TestCopyBlobSuccess(t *testing.T) {
 	reader := newMockOCIReader()
 	reader.addBlob(d, data)
 
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 
 	err := copyBlob(writer, reader, d)
 	if err != nil {
@@ -338,6 +358,7 @@ func TestCopyBlobSuccess(t *testing.T) {
 	if !ok {
 		t.Fatal("blob was not written")
 	}
+
 	if !bytes.Equal(written, data) {
 		t.Errorf("written data = %q, want %q", written, data)
 	}
@@ -347,9 +368,10 @@ func TestCopyBlobError(t *testing.T) {
 	reader := newMockOCIReader()
 	reader.readErr = fmt.Errorf("read failed")
 
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 
 	d := digest.FromBytes([]byte("test"))
+
 	err := copyBlob(writer, reader, d)
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -367,7 +389,7 @@ func TestWriteFileFromPathSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 
 	err := writeFileFromPath(writer, "output.txt", filePath)
 	if err != nil {
@@ -379,13 +401,14 @@ func TestWriteFileFromPathSuccess(t *testing.T) {
 	if !ok {
 		t.Fatal("file was not written")
 	}
+
 	if !bytes.Equal(written, content) {
 		t.Errorf("written content = %q, want %q", written, content)
 	}
 }
 
 func TestWriteFileFromPathNotFound(t *testing.T) {
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 
 	err := writeFileFromPath(writer, "output.txt", "/nonexistent/file.txt")
 	if err == nil {
@@ -401,13 +424,14 @@ func TestWriteFileFromPathWriteError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 	writer.writeErr = fmt.Errorf("write failed")
 
 	err := writeFileFromPath(writer, "output.txt", filePath)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
+
 	if !strings.Contains(err.Error(), "write failed") {
 		t.Errorf("expected write error, got: %v", err)
 	}
@@ -426,7 +450,7 @@ func TestProcessLayerDiffSuccess(t *testing.T) {
 	// Create a mock data source (empty since our tar-diff is just adding a new file)
 	dataSource := newMockDataSource()
 
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 	log := SilentLogger{}
 
 	// We don't know the expected diffID in advance, so pass empty
@@ -439,6 +463,7 @@ func TestProcessLayerDiffSuccess(t *testing.T) {
 	if newDigest == "" {
 		t.Error("expected non-empty digest")
 	}
+
 	if newSize == 0 {
 		t.Error("expected non-zero size")
 	}
@@ -458,10 +483,12 @@ func TestProcessLayerDiffSuccess(t *testing.T) {
 
 	// Verify we can read the tar content
 	tr := tar.NewReader(gr)
+
 	header, err := tr.Next()
 	if err != nil {
 		t.Fatalf("failed to read tar header: %v", err)
 	}
+
 	if header.Name != testFile {
 		t.Errorf("tar file name = %q, want %q", header.Name, testFile)
 	}
@@ -470,6 +497,7 @@ func TestProcessLayerDiffSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read tar content: %v", err)
 	}
+
 	if !bytes.Equal(content, testContent) {
 		t.Errorf("tar content = %q, want %q", content, testContent)
 	}
@@ -483,7 +511,7 @@ func TestProcessLayerDiffWithExpectedDiffID(t *testing.T) {
 	tarDiff := createTestTarDiff(t, testFile, testContent)
 
 	dataSource := newMockDataSource()
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 	log := SilentLogger{}
 
 	// First, run without expectedDiffID to get the actual diffID
@@ -501,7 +529,7 @@ func TestProcessLayerDiffWithExpectedDiffID(t *testing.T) {
 	expectedDiffID := digest.FromBytes(uncompressed.Bytes())
 
 	// Reset writer
-	writer = newMockOCIWriter("test-image")
+	writer = newMockOCIWriter()
 
 	// Run again with the expected diffID - should succeed
 	_, _, err = processLayerDiff(dir, log, writer, bytes.NewReader(tarDiff), expectedDiffID, dataSource)
@@ -518,7 +546,7 @@ func TestProcessLayerDiffDiffIDMismatch(t *testing.T) {
 	tarDiff := createTestTarDiff(t, testFile, testContent)
 
 	dataSource := newMockDataSource()
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 	log := SilentLogger{}
 
 	// Use a wrong expectedDiffID
@@ -528,6 +556,7 @@ func TestProcessLayerDiffDiffIDMismatch(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for diffID mismatch, got nil")
 	}
+
 	if !strings.Contains(err.Error(), "diff_id mismatch") {
 		t.Errorf("expected 'diff_id mismatch' error, got: %v", err)
 	}
@@ -539,13 +568,14 @@ func TestProcessLayerDiffInvalidTmpDir(t *testing.T) {
 
 	tarDiff := createTestTarDiff(t, "file.txt", []byte("content"))
 	dataSource := newMockDataSource()
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 	log := SilentLogger{}
 
 	_, _, err := processLayerDiff(invalidDir, log, writer, bytes.NewReader(tarDiff), "", dataSource)
 	if err == nil {
 		t.Fatal("expected error for invalid tmpDir, got nil")
 	}
+
 	if !strings.Contains(err.Error(), "failed to create temp file") {
 		t.Errorf("expected temp file creation error, got: %v", err)
 	}
@@ -558,7 +588,7 @@ func TestProcessLayerDiffTarPatchError(t *testing.T) {
 	invalidTarDiff := []byte("tardf1\n\x00invalid data")
 
 	dataSource := newMockDataSource()
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 	log := SilentLogger{}
 
 	_, _, err := processLayerDiff(dir, log, writer, bytes.NewReader(invalidTarDiff), "", dataSource)
@@ -633,7 +663,7 @@ func TestApplyDeltaSuccess(t *testing.T) {
 		},
 	}
 
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 	dataSource := newMockDataSource()
 	opts := ApplyOptions{TmpDir: tmpDir}
 	log := SilentLogger{}
@@ -650,12 +680,14 @@ func TestApplyDeltaSuccess(t *testing.T) {
 
 	// Verify image config was written
 	configWritten := false
+
 	for name := range writer.files {
 		if strings.Contains(name, imageConfigDigest.Encoded()) {
 			configWritten = true
 			break
 		}
 	}
+
 	if !configWritten {
 		t.Error("image config was not written")
 	}
@@ -724,7 +756,7 @@ func TestApplyDeltaWithReusedLayer(t *testing.T) {
 		},
 	}
 
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 	dataSource := newMockDataSource()
 	opts := ApplyOptions{TmpDir: tmpDir}
 	log := SilentLogger{}
@@ -789,7 +821,7 @@ func TestApplyDeltaReadBlobError(t *testing.T) {
 		},
 	}
 
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 	dataSource := newMockDataSource()
 	opts := ApplyOptions{TmpDir: tmpDir}
 	log := SilentLogger{}
@@ -798,6 +830,7 @@ func TestApplyDeltaReadBlobError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
+
 	if !strings.Contains(err.Error(), "failed to write image config") {
 		t.Errorf("expected image config write error, got: %v", err)
 	}
@@ -854,7 +887,7 @@ func TestApplyDeltaWithOriginalLayer(t *testing.T) {
 		},
 	}
 
-	writer := newMockOCIWriter("test-image")
+	writer := newMockOCIWriter()
 	dataSource := newMockDataSource()
 	opts := ApplyOptions{TmpDir: tmpDir}
 	log := SilentLogger{}
@@ -866,12 +899,14 @@ func TestApplyDeltaWithOriginalLayer(t *testing.T) {
 
 	// Verify the layer was copied
 	layerWritten := false
+
 	for name := range writer.files {
 		if strings.Contains(name, originalLayerDigest.Encoded()) {
 			layerWritten = true
 			break
 		}
 	}
+
 	if !layerWritten {
 		t.Error("original layer was not copied")
 	}
