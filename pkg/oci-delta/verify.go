@@ -25,15 +25,17 @@ func VerifyDeltaSignature(delta *DeltaArtifact, verifier sigstoreSignature.Verif
 	expectedDigest := delta.ImageManifestDigest()
 
 	var firstErr error
+
 	for i, sig := range sigs {
-		if err := verifySignatureManifest(delta, verifier, expectedDigest, &sig, log); err == nil {
+		err := verifySignatureManifest(delta, verifier, expectedDigest, &sig, log)
+		if err == nil {
 			log.Debug("Signature verification passed")
 			return nil
-		} else {
-			log.Debug("Signature %d verification failed: %v", i, err)
-			if firstErr == nil {
-				firstErr = err
-			}
+		}
+		log.Debug("Signature %d verification failed: %v", i, err)
+
+		if firstErr == nil {
+			firstErr = err
 		}
 	}
 
@@ -64,6 +66,7 @@ func verifySignatureLayer(delta *DeltaArtifact, verifier sigstoreSignature.Verif
 	if err := json.Unmarshal(payload, &p); err != nil {
 		return fmt.Errorf("failed to parse signature payload: %w", err)
 	}
+
 	if p.Critical.Type != sigpayload.CosignSignatureType {
 		return fmt.Errorf("unexpected signature type: %s", p.Critical.Type)
 	}
@@ -72,6 +75,7 @@ func verifySignatureLayer(delta *DeltaArtifact, verifier sigstoreSignature.Verif
 	if err != nil {
 		return fmt.Errorf("invalid docker-manifest-digest in signature payload: %w", err)
 	}
+
 	if payloadDigest != expectedDigest {
 		return fmt.Errorf("signature is for manifest %s, but delta targets %s",
 			payloadDigest.Encoded()[:16], expectedDigest.Encoded()[:16])
@@ -79,24 +83,28 @@ func verifySignatureLayer(delta *DeltaArtifact, verifier sigstoreSignature.Verif
 
 	log.Debug("  Verified signature for manifest %s (ref: %s)",
 		expectedDigest.Encoded()[:16], p.Critical.Identity.DockerReference)
+
 	return nil
 }
 
 func verifySignatureManifest(delta *DeltaArtifact, verifier sigstoreSignature.Verifier, expectedDigest digest.Digest, sig *EmbeddedSignature, log Logger) error {
 	var firstErr error
+
 	for i, layer := range sig.Manifest.Layers {
-		if err := verifySignatureLayer(delta, verifier, expectedDigest, &layer, log); err == nil {
+		err := verifySignatureLayer(delta, verifier, expectedDigest, &layer, log)
+		if err == nil {
 			return nil
-		} else {
-			log.Debug("  Signature layer %d verification failed: %v", i, err)
-			if firstErr == nil {
-				firstErr = err
-			}
+		}
+		log.Debug("  Signature layer %d verification failed: %v", i, err)
+
+		if firstErr == nil {
+			firstErr = err
 		}
 	}
 
 	if firstErr != nil {
 		return firstErr
 	}
+
 	return fmt.Errorf("no signature layers found")
 }

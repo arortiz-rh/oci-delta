@@ -30,6 +30,21 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev libgpgme-dev libbtrfs-dev libdevmapper-dev libostree-dev
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12
+          args: --config .golangci.yml
+
   test:
     runs-on: ubuntu-latest
     steps:

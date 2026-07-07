@@ -15,22 +15,27 @@ import (
 
 func createTestTar(t *testing.T, files map[string][]byte) string {
 	t.Helper()
+
 	tmp, err := os.CreateTemp("", "tarindex-test-*.tar")
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	w, err := newTarOCIWriter(tmp.Name(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	for name, data := range files {
 		if err := w.WriteFile(name, data); err != nil {
 			t.Fatal(err)
 		}
 	}
+
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}
+
 	return tmp.Name()
 }
 
@@ -54,17 +59,21 @@ func TestTarIndexReadBlob(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadBlob(%s): %v", d, err)
 	}
+
 	if size != int64(len(blobContent)) {
 		t.Errorf("ReadBlob size = %d, want %d", size, len(blobContent))
 	}
+
 	if actualDigest != d {
 		t.Errorf("ReadBlob actualDigest = %s, want %s", actualDigest, d)
 	}
 	got, err := io.ReadAll(r)
 	r.Close()
+
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if !bytes.Equal(got, blobContent) {
 		t.Errorf("ReadBlob = %q, want %q", got, blobContent)
 	}
@@ -106,6 +115,7 @@ func TestTarIndexSeekable(t *testing.T) {
 
 	buf := make([]byte, 4)
 	r.Read(buf)
+
 	if string(buf) != "seek" {
 		t.Errorf("first read = %q, want \"seek\"", buf)
 	}
@@ -113,6 +123,7 @@ func TestTarIndexSeekable(t *testing.T) {
 	r.Seek(0, io.SeekStart)
 	buf2 := make([]byte, 4)
 	r.Read(buf2)
+
 	if string(buf2) != "seek" {
 		t.Errorf("after seek = %q, want \"seek\"", buf2)
 	}
@@ -152,11 +163,13 @@ func TestDirOCIReaderReadBlob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if size != 4 {
 		t.Errorf("size = %d, want 4", size)
 	}
 	data, _ := io.ReadAll(r)
 	r.Close()
+
 	if string(data) != "blob" {
 		t.Errorf("content = %q", data)
 	}
@@ -164,6 +177,7 @@ func TestDirOCIReaderReadBlob(t *testing.T) {
 
 func TestDirOCIReaderMissing(t *testing.T) {
 	reader := NewDirOCIReader(t.TempDir(), "")
+
 	_, _, _, err := reader.ReadBlob(digest.FromBytes([]byte("missing")))
 	if err == nil {
 		t.Error("expected error for missing blob")
@@ -186,11 +200,13 @@ func TestTarOCIWriterRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	for d, data := range blobs {
 		if err := w.WriteFile(blobTarName(d), data); err != nil {
 			t.Fatalf("WriteFile(%s): %v", d, err)
 		}
 	}
+
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -208,6 +224,7 @@ func TestTarOCIWriterRoundTrip(t *testing.T) {
 		}
 		got, _ := io.ReadAll(r)
 		r.Close()
+
 		if !bytes.Equal(got, want) {
 			t.Errorf("ReadBlob(%s) = %q, want %q", d, got, want)
 		}
@@ -225,6 +242,7 @@ func TestTarOCIWriterFromReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if err := w.WriteFileFromReader(blobTarName(d), int64(len(content)), strings.NewReader(string(content))); err != nil {
 		t.Fatal(err)
 	}
@@ -242,6 +260,7 @@ func TestTarOCIWriterFromReader(t *testing.T) {
 	}
 	got, _ := io.ReadAll(r)
 	r.Close()
+
 	if string(got) != string(content) {
 		t.Errorf("got %q, want %q", got, content)
 	}
@@ -276,6 +295,7 @@ func TestTarOCIWriterParentDirs(t *testing.T) {
 
 func TestDirOCIWriterWriteFile(t *testing.T) {
 	dir := t.TempDir()
+
 	w, err := newDirOCIWriter(filepath.Join(dir, "output"), "")
 	if err != nil {
 		t.Fatal(err)
@@ -290,6 +310,7 @@ func TestDirOCIWriterWriteFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if string(got) != "content" {
 		t.Errorf("got %q, want \"content\"", got)
 	}
@@ -297,6 +318,7 @@ func TestDirOCIWriterWriteFile(t *testing.T) {
 
 func TestDirOCIWriterFromReader(t *testing.T) {
 	dir := t.TempDir()
+
 	w, err := newDirOCIWriter(filepath.Join(dir, "output"), "")
 	if err != nil {
 		t.Fatal(err)
@@ -312,6 +334,7 @@ func TestDirOCIWriterFromReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if string(got) != content {
 		t.Errorf("got %q, want %q", got, content)
 	}
@@ -325,10 +348,12 @@ func TestReadBlob(t *testing.T) {
 	reader := newMemoryReader(map[string][]byte{
 		blobTarName(d): content,
 	})
+
 	data, err := readBlob(reader, d)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if string(data) != "hello" {
 		t.Errorf("got %q, want \"hello\"", data)
 	}
@@ -343,6 +368,7 @@ func TestReadBlob(t *testing.T) {
 	corruptReader := newMemoryReader(map[string][]byte{
 		blobTarName(wrongDigest): content,
 	})
+
 	_, err = readBlob(corruptReader, wrongDigest)
 	if err == nil {
 		t.Error("expected error for digest mismatch")
@@ -398,11 +424,13 @@ func TestOpenOCIReaderDefaultArchive(t *testing.T) {
 
 func TestOpenOCIWriterTar(t *testing.T) {
 	dir := t.TempDir()
+
 	w, err := OpenOCIWriter(filepath.Join(dir, "out.tar"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w.Close()
+
 	if _, ok := w.(*tarOCIWriter); !ok {
 		t.Errorf("expected *tarOCIWriter, got %T", w)
 	}
@@ -410,11 +438,13 @@ func TestOpenOCIWriterTar(t *testing.T) {
 
 func TestOpenOCIWriterOCIArchive(t *testing.T) {
 	dir := t.TempDir()
+
 	w, err := OpenOCIWriter("oci-archive:" + filepath.Join(dir, "out.tar"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w.Close()
+
 	if _, ok := w.(*tarOCIWriter); !ok {
 		t.Errorf("expected *tarOCIWriter, got %T", w)
 	}
@@ -422,11 +452,13 @@ func TestOpenOCIWriterOCIArchive(t *testing.T) {
 
 func TestOpenOCIWriterOCIDir(t *testing.T) {
 	dir := t.TempDir()
+
 	w, err := OpenOCIWriter("oci:" + filepath.Join(dir, "out"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w.Close()
+
 	if _, ok := w.(*dirOCIWriter); !ok {
 		t.Errorf("expected *dirOCIWriter, got %T", w)
 	}

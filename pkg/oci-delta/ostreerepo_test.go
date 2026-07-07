@@ -21,6 +21,7 @@ func createTestOstreeRepo(t *testing.T) (repoPath, ref string) {
 
 	run := func(args ...string) {
 		t.Helper()
+
 		cmd := exec.Command(args[0], args[1:]...)
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
@@ -55,10 +56,12 @@ func TestOstreeDataSourceReadFile(t *testing.T) {
 	if err := ds.SetCurrentFile("usr/bin/hello"); err != nil {
 		t.Fatalf("SetCurrentFile: %v", err)
 	}
+
 	data, err := io.ReadAll(ds)
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}
+
 	if string(data) != "hello ostree" {
 		t.Errorf("got %q, want %q", data, "hello ostree")
 	}
@@ -76,10 +79,12 @@ func TestOstreeDataSourceEtcFallback(t *testing.T) {
 	if err := ds.SetCurrentFile("etc/conf.cfg"); err != nil {
 		t.Fatalf("SetCurrentFile(etc/...): %v", err)
 	}
+
 	data, err := io.ReadAll(ds)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if string(data) != "key=value" {
 		t.Errorf("got %q, want %q", data, "key=value")
 	}
@@ -111,13 +116,16 @@ func TestOstreeDataSourceSeek(t *testing.T) {
 	if err := ds.SetCurrentFile("usr/bin/hello"); err != nil {
 		t.Fatal(err)
 	}
+
 	pos, err := ds.Seek(6, io.SeekStart)
 	if err != nil {
 		t.Fatalf("Seek: %v", err)
 	}
+
 	if pos != 6 {
 		t.Errorf("Seek returned %d, want 6", pos)
 	}
+
 	data, _ := io.ReadAll(ds)
 	if string(data) != "ostree" {
 		t.Errorf("after seek got %q, want %q", data, "ostree")
@@ -136,9 +144,11 @@ func TestOstreeDataSourceSwitchFile(t *testing.T) {
 	if err := ds.SetCurrentFile("usr/bin/hello"); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := ds.SetCurrentFile("usr/lib/libfoo.so"); err != nil {
 		t.Fatal(err)
 	}
+
 	data, _ := io.ReadAll(ds)
 	if string(data) != "fake shared lib content" {
 		t.Errorf("got %q, want %q", data, "fake shared lib content")
@@ -157,6 +167,7 @@ func TestOstreeDataSourceReadNoFile(t *testing.T) {
 	if _, err := ds.Read(buf); err == nil {
 		t.Error("expected error reading with no current file")
 	}
+
 	if _, err := ds.Seek(0, io.SeekStart); err == nil {
 		t.Error("expected error seeking with no current file")
 	}

@@ -172,13 +172,14 @@ func enumerateDir(dir *C.GFile, prefix string, result map[string]string) error {
 		child := C.g_file_get_child(dir, cName)
 		C.free(unsafe.Pointer(cName))
 
-		if fileType == C.G_FILE_TYPE_DIRECTORY {
+		switch fileType {
+		case C.G_FILE_TYPE_DIRECTORY:
 			err := enumerateDir(child, path, result)
 			C.g_object_unref(C.gpointer(child))
 			if err != nil {
 				return err
 			}
-		} else if fileType == C.G_FILE_TYPE_REGULAR {
+		case C.G_FILE_TYPE_REGULAR:
 			repoFile := ((*C.OstreeRepoFile)(unsafe.Pointer(child)))
 
 			var resolveErr *C.GError
@@ -195,7 +196,7 @@ func enumerateDir(dir *C.GFile, prefix string, result map[string]string) error {
 			if len(checksum) >= 2 {
 				result[path] = checksum[:2] + "/" + checksum[2:] + ".file"
 			}
-		} else {
+		default:
 			C.g_object_unref(C.gpointer(child))
 		}
 	}

@@ -29,6 +29,7 @@ func OpenContainerStorage(graphRoot string) (storage.Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get default store options: %w", err)
 	}
+
 	if graphRoot != "" {
 		storeOpts.GraphRoot = graphRoot
 	}
@@ -37,6 +38,7 @@ func OpenContainerStorage(graphRoot string) (storage.Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open container storage: %w", err)
 	}
+
 	return store, nil
 }
 
@@ -128,6 +130,7 @@ func getSignatureSizes(store storage.Store, imageID string) ([]int, string, erro
 	if err != nil {
 		return nil, "", nil
 	}
+
 	manifestDigest := digest.FromBytes(manifestData)
 	if sizes, ok := meta.SignaturesSizes[manifestDigest]; ok && len(sizes) > 0 {
 		key := "signature-" + manifestDigest.Encoded()
@@ -139,6 +142,7 @@ func getSignatureSizes(store storage.Store, imageID string) ([]int, string, erro
 
 func parseSigstoreBlobs(blob []byte, sizes []int) []sigstoreJSONRepresentation {
 	var sigs []sigstoreJSONRepresentation
+
 	offset := 0
 	for _, size := range sizes {
 		if offset+size > len(blob) {
@@ -158,6 +162,7 @@ func parseSigstoreBlobs(blob []byte, sizes []int) []sigstoreJSONRepresentation {
 		}
 		sigs = append(sigs, rep)
 	}
+
 	return sigs
 }
 
@@ -199,6 +204,7 @@ func buildSignatureArtifact(sigs []sigstoreJSONRepresentation) (*signatureArtifa
 		},
 		Layers: layers,
 	}
+
 	manifestData, err := json.Marshal(manifest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal signature manifest: %w", err)
@@ -218,10 +224,12 @@ func ExtractContainerStorageSignatures(store storage.Store, imageID string, log 
 	if err != nil {
 		return nil, err
 	}
+
 	if len(sizes) == 0 {
 		if log != nil {
 			log.Debug("No signatures found in container storage for image %s", imageID[:16])
 		}
+
 		return nil, nil
 	}
 
@@ -235,6 +243,7 @@ func ExtractContainerStorageSignatures(store storage.Store, imageID string, log 
 		if log != nil {
 			log.Debug("No sigstore signatures found in container storage for image %s", imageID[:16])
 		}
+
 		return nil, nil
 	}
 

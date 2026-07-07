@@ -1,4 +1,4 @@
-.PHONY: build clean test test-coverage fmt man
+.PHONY: build clean test test-coverage fmt lint man
 
 COVERDIR ?= $(CURDIR)/.coverdata
 
@@ -33,6 +33,10 @@ test-coverage:
 
 fmt:
 	go fmt ./...
+
+lint:
+	go vet ./...
+	golangci-lint run --fix -c .golangci.yml
 
 install:
 	go install

@@ -25,10 +25,12 @@ func (m *mockStore) LayersByUncompressedDigest(d digest.Digest) ([]storage.Layer
 	if m.layersByUncompressedDigestErr != nil {
 		return nil, m.layersByUncompressedDigestErr
 	}
+
 	layers, ok := m.layersByDigest[d]
 	if !ok {
 		return nil, nil
 	}
+
 	return layers, nil
 }
 
@@ -36,10 +38,12 @@ func (m *mockStore) Diff(from, to string, options *storage.DiffOptions) (io.Read
 	if m.diffErr != nil {
 		return nil, m.diffErr
 	}
+
 	data, ok := m.diffData[to]
 	if !ok {
 		return nil, fmt.Errorf("layer %s not found", to)
 	}
+
 	return io.NopCloser(bytes.NewReader(data)), nil
 }
 
@@ -49,8 +53,10 @@ func (m *mockStore) PutLayer(id, parent string, names []string, mountLabel strin
 		if err != nil {
 			return nil, -1, err
 		}
+
 		return layer, 11, nil
 	}
+
 	return nil, -1, fmt.Errorf("putLayerCallback not set")
 }
 
@@ -204,9 +210,11 @@ func TestReuseStorageLayer(t *testing.T) {
 				if err != nil {
 					t.Fatalf("reuseStorageLayer failed: %v", err)
 				}
+
 				if reusedLayer.UncompressedDigest != tt.diffID {
 					t.Errorf("digest mismatch: got %s, want %s", reusedLayer.UncompressedDigest, tt.diffID)
 				}
+
 				if tt.verifyParent && reusedLayer.Parent != tt.expectedParent {
 					t.Errorf("parent mismatch: got %s, want %s", reusedLayer.Parent, tt.expectedParent)
 				}

@@ -49,6 +49,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	log := &cmdLogger{debug: createDebug}
 
 	log.Debug("Opening old image: %s", args[0])
+
 	oldReader, err := ocidelta.OpenOCIReader(args[0], tmpDir, log)
 	if err != nil {
 		return fmt.Errorf("failed to open old image: %w", err)
@@ -56,6 +57,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	defer oldReader.Close()
 
 	log.Debug("Opening new image: %s", args[1])
+
 	newReader, err := ocidelta.OpenOCIReader(args[1], tmpDir, log)
 	if err != nil {
 		return fmt.Errorf("failed to open new image: %w", err)
@@ -63,8 +65,10 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	defer newReader.Close()
 
 	sigReaders := ocidelta.ExtractedSignatures(newReader)
+
 	for _, sigPath := range createSignatures {
 		log.Debug("Opening signature: %s", sigPath)
+
 		sigReader, err := ocidelta.OpenOCIReader(sigPath, tmpDir, log)
 		if err != nil {
 			return fmt.Errorf("failed to open signature %s: %w", sigPath, err)
@@ -87,6 +91,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		writer.Close()
 		return err
 	}
+
 	if err := writer.Close(); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
@@ -100,6 +105,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Processed layer bytes:  %d\n", stats.ProcessedLayerBytes)
 		fmt.Printf("  Tar-diff layer bytes:   %d\n", stats.TarDiffLayerBytes)
 		fmt.Printf("  Original layer bytes:   %d\n", stats.OriginalLayerBytes)
+
 		if stats.ProcessedLayerBytes > 0 {
 			saved := stats.ProcessedLayerBytes - stats.TarDiffLayerBytes - stats.OriginalLayerBytes
 			pct := float64(saved) / float64(stats.ProcessedLayerBytes) * 100

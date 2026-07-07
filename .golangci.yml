@@ -1,0 +1,115 @@
+version: "2"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  fix: false
+
+linters:
+  default: none
+  enable:
+    - asciicheck
+    - bidichk
+    - dupword
+    - errcheck
+    - errorlint
+    - gocritic
+    - intrange
+    - lll
+    - misspell
+    - revive
+    - staticcheck
+    - thelper
+    - unparam
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+    - wsl_v5
+  
+  settings:
+    dupword:
+      keywords: []
+      ignore: []
+      comments-only: true
+        
+    errcheck:
+      exclude-functions:
+        # We use Shutdown for cleanup occasionally, checking it causes false alarms. 
+        - "(github.com/containers/storage.Store).Shutdown"
+
+    errorlint:
+      errorf: true
+      errorf-multi: true
+      asserts: true
+      comparison: true
+    
+    gocritic:
+      disabled-checks:
+        # Was resulting in false positives with C.* functions.
+        - dupSubExpr
+
+    lll:
+      line-length: 180
+
+    revive:
+      enable-all-rules: false
+      enable-default-rules: true
+
+      rules:                              # Covered By:
+        - name: context-keys-type         # staticcheck
+          disabled: true
+        - name: redefines-builtin-id      # gocritic
+          disabled: true
+        - name: unused-parameter          # unparam
+          disabled: true
+        - name: unreachable-code          # staticcheck
+          disabled: true
+        - name: errorf                    # errorlint
+          disabled: true
+        - name: unchecked-type-assertion  # errcheck
+          disabled: true
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+
+    unparam:
+      check-exported: false
+
+    whitespace:
+      multi-if: true
+      multi-func: true
+  
+    wsl_v5:
+      default: none
+      cuddle-max-statements: 3
+      enable:
+        - err
+        - if
+        - for
+        - range
+        - return
+        - trailing-whitespace
+        
+  exclusions:
+    generated: lax
+    warn-unused: false
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck # Having this during testing could produce a lot of noise.
+          - lll      # Table defintions may become long in the test files, which are difficult to split up.
+
+    paths: []
+    paths-except: []
