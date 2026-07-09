@@ -45,7 +45,7 @@ func ParseDeltaArtifact(reader OCIReader, log Logger) (*DeltaArtifact, error) {
 
 	deltaManifestData, err := readBlob(reader, deltaManifestDigest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read delta manifest: %w", err)
+		return nil, fmt.Errorf("failed to read delta manifest blob: %w", err)
 	}
 	var deltaManifest v1.Manifest
 	if err := json.Unmarshal(deltaManifestData, &deltaManifest); err != nil {
@@ -56,6 +56,10 @@ func ParseDeltaArtifact(reader OCIReader, log Logger) (*DeltaArtifact, error) {
 	}
 
 	sourceConfigDigest := deltaManifest.Annotations[annotationDeltaSourceConfig]
+
+	if sourceConfigDigest == "" {
+		return nil, fmt.Errorf("delta manifest missing required source config annotation: %s", annotationDeltaSourceConfig)
+	}
 
 	var imageManifestDesc, imageConfigDesc *v1.Descriptor
 	var sigManifestDescs []v1.Descriptor
@@ -91,7 +95,7 @@ func ParseDeltaArtifact(reader OCIReader, log Logger) (*DeltaArtifact, error) {
 
 	imageManifestData, err := readBlob(reader, imageManifestDesc.Digest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read embedded image manifest: %w", err)
+		return nil, fmt.Errorf("failed to read embedded image manifest blob: %w", err)
 	}
 	var imageManifest v1.Manifest
 	if err := json.Unmarshal(imageManifestData, &imageManifest); err != nil {
@@ -101,7 +105,7 @@ func ParseDeltaArtifact(reader OCIReader, log Logger) (*DeltaArtifact, error) {
 
 	imageConfigData, err := readBlob(reader, imageConfigDesc.Digest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read embedded image config: %w", err)
+		return nil, fmt.Errorf("failed to read embedded image config blob: %w", err)
 	}
 	var imageConfig v1.Image
 	if err := json.Unmarshal(imageConfigData, &imageConfig); err != nil {
