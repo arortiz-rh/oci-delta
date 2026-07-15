@@ -81,7 +81,12 @@ func runImport(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	imageID, err := ocidelta.ImportDelta(delta, store, ocidelta.ImportOptions{
+	dataSource, err := ocidelta.ResolveContainerStorageDataSource(store, delta.SourceConfigDigest(), log)
+	if err != nil {
+		return fmt.Errorf("failed to create data source: %w", err)
+	}
+
+	imageID, err := ocidelta.ImportDelta(delta, store, dataSource, ocidelta.ImportOptions{
 		Tag:    importTag,
 		TmpDir: tmpDir,
 	}, log)
