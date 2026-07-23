@@ -40,11 +40,20 @@ func Root() *cobra.Command {
 type Logger interface {
 	Debug(format string, args ...interface{})
 	Warning(format string, args ...interface{})
+	Default(format string, args ...interface{})
 }
 
 // cmdLogger implements the Logger interface
 type cmdLogger struct {
 	debug bool
+	quiet bool
+}
+
+func (l *cmdLogger) Default(format string, args ...interface{}) {
+	// Debug is a much more detailed version of the default logs, no need for both to exist at the same time.
+	if !l.quiet && !l.debug {
+		fmt.Printf(format+"\n", args...)
+	}
 }
 
 func (l *cmdLogger) Debug(format string, args ...interface{}) {

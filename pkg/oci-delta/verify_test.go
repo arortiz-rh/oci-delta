@@ -22,6 +22,7 @@ import (
 type testLogger struct{}
 
 func (l *testLogger) Debug(format string, args ...interface{})   {}
+func (l *testLogger) Default(format string, args ...interface{}) {}
 func (l *testLogger) Warning(format string, args ...interface{}) {}
 
 func createTestKey(t *testing.T) (sigstoreSignature.Verifier, *ecdsa.PrivateKey) {
